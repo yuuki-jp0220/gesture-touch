@@ -59,12 +59,12 @@ select{background:#26364b;color:white;border:1px solid var(--line);border-radius
 </section>
 <section class="card">
 <h2>ジェスチャー設定</h2>
-<label>上下スワイプ <input id="swipes" type="checkbox" checked></label>
+<label>上下フリック <input id="swipes" type="checkbox" checked></label>
 <label>ピンチでタップ <input id="pinch" type="checkbox" checked></label>
 <label>連続実行 <input id="repeat" type="checkbox"></label>
 <label>繰り返し間隔 <span><input id="interval" type="range" min="300" max="2000" step="100" value="800"> <span id="intervalText">800 ms</span></span></label>
 <label>スワイプ感度 <span><input id="sensitivity" type="range" min="5" max="25" value="10"> <span id="sensitivityText">10</span></span></label>
-<p class="note">手をカメラに向け、上下または斜め上下に動かしてください。斜めの動きも認識します。親指と人差し指を合わせるとタップ動作を検出します。</p>
+<p class="note">手をカメラに向け、人差し指を上下にサッと弾くように動かしてください。少し斜めでも上下フリックとして認識します。左右フリックは判定しません。親指と人差し指を合わせるとタップ動作を検出します。</p>
 </section>
 <section class="card"><h2>操作ログ</h2><div id="log">まだ操作はありません。</div></section>
 <section class="card">
@@ -76,7 +76,7 @@ select{background:#26364b;color:white;border:1px solid var(--line);border-radius
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 const $=id=>document.getElementById(id);
 const video=$("video"), canvas=$("overlay"), ctx=canvas.getContext("2d");
-let stream=null, landmarker=null, raf=0, previous=null, lastGestureAt=0, pinchWasDown=false;
+let stream=null, landmarker=null, raf=0, flickStart=null, lastGestureAt=0, pinchWasDown=false;
 const log=(s)=>{$("log").innerHTML=new Date().toLocaleTimeString()+"　"+s+"<br>"+$("log").innerHTML;};
 $("interval").addEventListener("input",()=> $("intervalText").textContent=$("interval").value+" ms");
 $("sensitivity").addEventListener("input",()=> $("sensitivityText").textContent=$("sensitivity").value);
@@ -102,7 +102,7 @@ function stop(){
   video.srcObject=null; ctx.clearRect(0,0,canvas.width,canvas.height);
   $("placeholder").style.display="grid"; $("status").textContent="停止しました";
   $("start").disabled=false;$("stop").disabled=true;$("handState").textContent="未検出";
-  $("gesture").textContent="待機中";previous=null;pinchWasDown=false;
+  $("gesture").textContent="待機中";flickStart=null;pinchWasDown=false;
 }
 function invoke(kind){
   const bridge=window.GestureTouchBridge;
@@ -130,21 +130,22 @@ function loop(){
     const pinch=Math.hypot(thumb.x-index.x,thumb.y-index.y)<0.055;
     if($("pinch").checked && pinch && !pinchWasDown) trigger("TAP");
     pinchWasDown=pinch;
-    if(previous && $("swipes").checked){
-      // 前フレームとの差ではなく開始位置からの移動量を測り、小さな動きも拾いやすくする
-      const dx=wrist.x-previous.x, dy=wrist.y-previous.y;
+    const now=performance.now();
+    if($("swipes").checked){
+      if(!flickStart) flickStart={x:wrist.x,y:wrist.y,t:now};
+      const dx=wrist.x-flickStart.x, dy=wrist.y-flickStart.y;
+      const elapsed=now-flickStart.t;
       const threshold=Number($("sensitivity").value)/100;
-      // 垂直方向に対して横ズレが大きすぎなければ、斜めスワイプも許容
+      // 500ms以内の素早い上下移動をフリックとして判定。斜め方向も少し許容。
       const verticalEnough=Math.abs(dy)>=Math.abs(dx)*0.55;
-      if(Math.abs(dy)>=threshold && verticalEnough){
+      if(elapsed<=500 && Math.abs(dy)>=threshold && verticalEnough){
         trigger(dy>0?"SWIPE_DOWN":"SWIPE_UP");
-        // 同じ動きを連続検出しないよう、次の判定開始位置を更新
-        previous={x:wrist.x,y:wrist.y};
+        flickStart={x:wrist.x,y:wrist.y,t:now};
+      }else if(elapsed>500){
+        flickStart={x:wrist.x,y:wrist.y,t:now};
       }
-    }
-    if(!previous) previous={x:wrist.x,y:wrist.y};
-    else if(!$("swipes").checked) previous={x:wrist.x,y:wrist.y};
-  }else{$("handState").textContent="未検出";previous=null;pinchWasDown=false;}
+    }else flickStart=null;
+  }else{$("handState").textContent="未検出";flickStart=null;pinchWasDown=false;}
   raf=requestAnimationFrame(loop);
 }
 $("start").addEventListener("click",start);$("stop").addEventListener("click",stop);

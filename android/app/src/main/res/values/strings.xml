@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Gesture Touch</string>
+    <string name="accessibility_description">Gesture Touchで検出した上下フリックを、画面上のスワイプ操作に変換します。</string>
+</resources>

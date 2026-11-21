@@ -69,7 +69,7 @@ select{background:#26364b;color:white;border:1px solid var(--line);border-radius
 <section class="card"><h2>操作ログ</h2><div id="log">まだ操作はありません。</div></section>
 <section class="card">
 <h2>Android連携について</h2>
-<p class="note">このHTML単体でできるのは、カメラ認識とジェスチャー判定までです。Android全体のスクロールやタップを実行するには、別途コンパニオンアプリとユーザー補助サービスが必要です。連携アプリがない場合、操作は実行せず検出結果だけを表示します。</p>
+<p class="note">通常のブラウザではカメラ認識と検出のみです。Gesture Touch Androidアプリ内で開き、Androidのユーザー補助サービスを有効にすると、上下フリックを画面上のスワイプ操作に変換します。Android連携で対応するのは上下フリックのみです。</p>
 </section>
 </main>
 <script type="module">
@@ -107,8 +107,10 @@ function stop(){
 function invoke(kind){
   const bridge=window.GestureTouchBridge;
   if(bridge && typeof bridge.performGesture==="function"){
-    try{bridge.performGesture(kind);$("actionState").textContent="Androidへ送信: "+kind;}
-    catch(e){$("actionState").textContent="連携エラー";}
+    if(kind==="SWIPE_UP" || kind==="SWIPE_DOWN"){
+      try{bridge.performGesture(kind);$("actionState").textContent="Androidへ送信: "+kind;}
+      catch(e){$("actionState").textContent="連携エラー";}
+    }else{$("actionState").textContent="Android連携は上下フリックのみ対応";}
   }else{$("actionState").textContent="検出のみ（Android連携なし）";}
   log(kind+" を検出");
 }

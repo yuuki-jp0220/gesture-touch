@@ -63,8 +63,8 @@ select{background:#26364b;color:white;border:1px solid var(--line);border-radius
 <label>ピンチでタップ <input id="pinch" type="checkbox" checked></label>
 <label>連続実行 <input id="repeat" type="checkbox"></label>
 <label>繰り返し間隔 <span><input id="interval" type="range" min="300" max="2000" step="100" value="800"> <span id="intervalText">800 ms</span></span></label>
-<label>スワイプ感度 <span><input id="sensitivity" type="range" min="8" max="30" value="16"> <span id="sensitivityText">16</span></span></label>
-<p class="note">手をカメラに向け、画面内で上下に素早く動かしてください。親指と人差し指を合わせるとタップ動作を検出します。</p>
+<label>スワイプ感度 <span><input id="sensitivity" type="range" min="5" max="25" value="10"> <span id="sensitivityText">10</span></span></label>
+<p class="note">手をカメラに向け、上下または斜め上下に動かしてください。斜めの動きも認識します。親指と人差し指を合わせるとタップ動作を検出します。</p>
 </section>
 <section class="card"><h2>操作ログ</h2><div id="log">まだ操作はありません。</div></section>
 <section class="card">
@@ -131,10 +131,19 @@ function loop(){
     if($("pinch").checked && pinch && !pinchWasDown) trigger("TAP");
     pinchWasDown=pinch;
     if(previous && $("swipes").checked){
-      const dx=wrist.x-previous.x, dy=wrist.y-previous.y, threshold=Number($("sensitivity").value)/100;
-      if(Math.abs(dy)>threshold && Math.abs(dy)>Math.abs(dx)*1.25) trigger(dy>0?"SWIPE_DOWN":"SWIPE_UP");
+      // 前フレームとの差ではなく開始位置からの移動量を測り、小さな動きも拾いやすくする
+      const dx=wrist.x-previous.x, dy=wrist.y-previous.y;
+      const threshold=Number($("sensitivity").value)/100;
+      // 垂直方向に対して横ズレが大きすぎなければ、斜めスワイプも許容
+      const verticalEnough=Math.abs(dy)>=Math.abs(dx)*0.55;
+      if(Math.abs(dy)>=threshold && verticalEnough){
+        trigger(dy>0?"SWIPE_DOWN":"SWIPE_UP");
+        // 同じ動きを連続検出しないよう、次の判定開始位置を更新
+        previous={x:wrist.x,y:wrist.y};
+      }
     }
-    previous={x:wrist.x,y:wrist.y};
+    if(!previous) previous={x:wrist.x,y:wrist.y};
+    else if(!$("swipes").checked) previous={x:wrist.x,y:wrist.y};
   }else{$("handState").textContent="未検出";previous=null;pinchWasDown=false;}
   raf=requestAnimationFrame(loop);
 }
